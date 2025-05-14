@@ -1,8 +1,12 @@
+"use client"; 
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Zap, BookOpenText, Search, PlayCircle, Users, TrendingUp, Lightbulb } from 'lucide-react';
+import { Zap, BookOpenText, Search, PlayCircle, Award, TrendingUp, Lightbulb } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '@/contexts/auth-context'; 
+import { Skeleton } from '@/components/ui/skeleton'; 
 
 const studyModes = [
   { title: 'Review Mode', description: 'Go over past sessions and missed questions.', icon: <BookOpenText className="h-6 w-6 text-accent" />, href: '/review', dataAiHint: 'book study' },
@@ -17,13 +21,64 @@ const quickTips = [
 ];
 
 export default function DashboardPage() {
-  // Placeholder user data
-  const user = { name: 'User Name' };
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="mb-8">
+          <Skeleton className="h-10 w-3/4 mb-2" />
+          <Skeleton className="h-5 w-1/2" />
+        </div>
+         <div className="grid gap-8 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-8">
+                <Card className="shadow-lg">
+                  <CardHeader> <Skeleton className="h-8 w-1/2 mb-2" /> <Skeleton className="h-4 w-1/3" /></CardHeader>
+                  <CardContent> <Skeleton className="h-6 w-3/4 mb-4" /> <Skeleton className="h-12 w-40" /> </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {[1,2,3].map(i => <Skeleton key={i} className="h-56 w-full" />)}
+                  </CardContent>
+                </Card>
+            </div>
+            <div className="space-y-8">
+                <Card>
+                  <CardHeader><Skeleton className="h-6 w-1/2" /></CardHeader>
+                  <CardContent className="space-y-4">
+                     {[1,2,3].map(i => <div key={i} className="flex gap-3"><Skeleton className="h-5 w-5 rounded-full" /><div className="space-y-1 flex-1"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-full" /></div></div>)}
+                  </CardContent>
+                </Card>
+                 <Card>
+                  <CardHeader><Skeleton className="h-6 w-1/2" /><Skeleton className="h-4 w-3/4 mt-1" /></CardHeader>
+                  <CardContent className="space-y-3">
+                     <Skeleton className="h-4 w-full" />
+                     <Skeleton className="h-4 w-full" />
+                     <Skeleton className="h-10 w-full mt-2" />
+                  </CardContent>
+                </Card>
+            </div>
+         </div>
+      </div>
+    );
+  }
+
+  // If not loading and no user, AuthProvider should redirect.
+  // A fallback or a message can be shown if needed, but typically this state won't be rendered for long.
+  if (!user) {
+    return (
+      <div className="container mx-auto p-4 md:p-6 text-center">
+        <p>Redirecting to login...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="container mx-auto p-4 md:p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.name}!</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.displayName || user.email || 'User'}!</h1>
         <p className="text-muted-foreground">Ready to ace your ENURM exam? Let's get started.</p>
       </div>
 
@@ -94,6 +149,7 @@ export default function DashboardPage() {
                <CardDescription>A quick look at your overall performance.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Placeholder data - replace with dynamic data if available */}
               <div className="flex justify-between">
                 <span>Average Score:</span>
                 <span className="font-semibold">85%</span>

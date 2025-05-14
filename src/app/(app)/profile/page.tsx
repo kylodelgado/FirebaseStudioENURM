@@ -1,31 +1,35 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Edit3, LogOut, Award, BarChart3, Save, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/auth-context'; 
+import { Skeleton } from '@/components/ui/skeleton'; 
+import { useToast } from '@/hooks/use-toast';
+import { updateProfile as firebaseUpdateProfile } from 'firebase/auth'; 
+// For Firestore updates, you'd import { doc, setDoc, getDoc } from "firebase/firestore"; and db from "@/lib/firebase";
 
-// Placeholder data
-const userProfile = {
-  name: 'User Name',
-  email: 'user@example.com',
-  age: 25,
-  school: 'University of Medical Sciences',
-  degree: 'MD Candidate',
-  avatar: 'https://placehold.co/150x150.png',
-};
+interface UserProfileData {
+  name: string;
+  email: string;
+  avatar: string; // This will be a data URL for preview, or photoURL from Firebase
+  age?: number | string; 
+  school?: string;
+  degree?: string;
+}
 
+// Placeholder stats and achievements - these would come from a database (e.g., Firestore)
 const userStats = {
   sessionsCompleted: 12,
   totalQuestions: 250,
   correctAnswers: 210,
-  averageScore: 84, // (210/250 * 100)
+  averageScore: 84,
 };
 
 const achievementsSummary = [
@@ -34,24 +38,158 @@ const achievementsSummary = [
   { name: 'Perfect Score', unlocked: true, description: "Achieve 100% in an exam simulation." },
 ];
 
-export default function ProfilePage() {
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(userProfile);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'age' ? parseInt(value) || 0 : value }));
+export default function ProfilePage() {
+  const { user, signOut, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState<UserProfileData>({
+    name: '',
+    email: '',
+    avatar: '',
+    age: '',
+    school: '',
+    degree: ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // TODO: Fetch extended profile data (age, school, degree) from Firestore here if available
+      setFormData({
+        name: user.displayName || '',
+        email: user.email || '',
+        avatar: user.photoURL || `https://placehold.co/150x150.png?text=${getInitials(user.displayName || user.email)}`,
+        // Load these from Firestore if they exist
+        age: '', // Placeholder, fetch from Firestore
+        school: '', // Placeholder, fetch from Firestore
+        degree: '', // Placeholder, fetch from Firestore
+      });
+    }
+  }, [user]);
+
+  const getInitials = (name?: string | null) => {
+    if (!name) return 'U';
+    if (name.includes('@') && name.split(' ').length === 1) {
+      return name.charAt(0).toUpperCase();
+    }
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  const handleSave = () => {
-    console.log("Saving profile:", formData); // Placeholder for Firebase update
-    setIsEditing(false);
-    // Update userProfile (or refetch from Firebase)
-    Object.assign(userProfile, formData);
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: name === 'age' ? (value === '' ? '' : parseInt(value)) : value }));
+  };
+
+  const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && typeof event.target.result === 'string') {
+          setFormData(prev => ({ ...prev, avatar: event.target.result as string }));
+          // Note: This sets a data URL for preview. Actual upload to Firebase Storage and updating
+          // user.photoURL would happen on save.
+        }
+      }
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      // Update Firebase Auth profile (displayName and photoURL)
+      // For photoURL, you'd first upload formData.avatar (if it's a new file Data URL) to Firebase Storage,
+      // get the download URL, then use that URL with firebaseUpdateProfile.
+      // This part is simplified for now.
+      let photoURLToUpdate = user.photoURL;
+      if (formData.avatar && formData.avatar.startsWith('data:image')) {
+         // This is a placeholder for actual image upload logic
+        console.warn("Avatar is a data URL. Actual upload to Firebase Storage and URL retrieval needed.");
+        toast({title: "Avatar Update Pending", description: "Avatar upload to storage not implemented. Current avatar won't change on Firebase unless it's an existing URL."})
+        // For now, we won't update photoURL if it's a new data URL to avoid errors
+        // photoURLToUpdate = await uploadImageToStorageAndGetURL(formData.avatar); // Hypothetical function
+      } else if (formData.avatar) {
+        photoURLToUpdate = formData.avatar; // Assumes it's already a valid URL
+      }
+
+
+      await firebaseUpdateProfile(user, { 
+        displayName: formData.name,
+        // photoURL: photoURLToUpdate, // Enable once image upload is handled
+      });
+      
+      // TODO: Update extended profile data (age, school, degree) in Firestore
+      // Example: const userDocRef = doc(db, "users", user.uid);
+      // await setDoc(userDocRef, { age: formData.age, school: formData.school, degree: formData.degree }, { merge: true });
+
+      toast({ title: "Profile Updated", description: "Your display name has been updated. Other fields require Firestore setup." });
+      setIsEditing(false);
+    } catch (error: any) {
+      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+      console.error("Error updating profile: ", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
   
-  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    if (user) {
+         setFormData({
+            name: user.displayName || '',
+            email: user.email || '',
+            avatar: user.photoURL || `https://placehold.co/150x150.png?text=${getInitials(user.displayName || user.email)}`,
+            age: '', // Reset to fetched or empty
+            school: '', // Reset to fetched or empty
+            degree: '', // Reset to fetched or empty
+      });
+    }
+  }
 
+
+  if (authLoading) {
+    return (
+      <div className="container mx-auto p-4 md:p-6 space-y-8">
+        <Card className="shadow-lg">
+          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <div className="mt-4 md:mt-0 flex gap-2">
+              <Skeleton className="h-10 w-28" />
+              <Skeleton className="h-10 w-28" />
+            </div>
+          </CardHeader>
+          <CardContent className="grid md:grid-cols-3 gap-8">
+            <div className="md:col-span-1 flex flex-col items-center space-y-4">
+              <Skeleton className="h-32 w-32 rounded-full" />
+              <div className="text-center space-y-2">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+            </div>
+            <div className="md:col-span-2 space-y-6">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+         <div className="grid md:grid-cols-2 gap-8">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <div className="container mx-auto p-6 text-center">Redirecting to login...</div>;
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-8">
@@ -64,13 +202,13 @@ export default function ProfilePage() {
           <div className="mt-4 md:mt-0 flex gap-2">
             {isEditing ? (
               <>
-                <Button onClick={handleSave}><Save className="mr-2 h-4 w-4" /> Save</Button>
-                <Button variant="outline" onClick={() => { setIsEditing(false); setFormData(userProfile); }}><X className="mr-2 h-4 w-4" /> Cancel</Button>
+                <Button onClick={handleSave} disabled={isSaving}><Save className="mr-2 h-4 w-4" /> {isSaving ? 'Saving...' : 'Save'}</Button>
+                <Button variant="outline" onClick={handleCancelEdit} disabled={isSaving}><X className="mr-2 h-4 w-4" /> Cancel</Button>
               </>
             ) : (
               <Button onClick={() => setIsEditing(true)}><Edit3 className="mr-2 h-4 w-4" /> Edit Profile</Button>
             )}
-            <Button variant="outline" onClick={() => alert("Logout (Not Implemented)")}><LogOut className="mr-2 h-4 w-4" /> Log Out</Button>
+            <Button variant="outline" onClick={signOut} disabled={isSaving}><LogOut className="mr-2 h-4 w-4" /> Log Out</Button>
           </div>
         </CardHeader>
         <CardContent className="grid md:grid-cols-3 gap-8">
@@ -79,52 +217,49 @@ export default function ProfilePage() {
               <AvatarImage src={formData.avatar} alt={formData.name} data-ai-hint="person avatar" />
               <AvatarFallback className="text-4xl">{getInitials(formData.name)}</AvatarFallback>
             </Avatar>
-            {isEditing && <Input type="file" accept="image/*" className="text-sm" onChange={(e) => {
-              if(e.target.files && e.target.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  if (event.target && typeof event.target.result === 'string') {
-                    setFormData(prev => ({ ...prev, avatar: event.target.result as string }));
-                  }
-                }
-                reader.readAsDataURL(e.target.files[0]);
-              }
-            }} />}
+            {isEditing && (
+              <>
+                <Label htmlFor="avatar-upload" className="text-sm text-primary cursor-pointer hover:underline">Change Avatar</Label>
+                <Input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                {/* <Input type="text" name="avatar" placeholder="Or enter image URL" value={formData.avatar.startsWith('data:image') ? '' : formData.avatar} onChange={handleInputChange} className="text-sm mt-2"/> */}
+              </>
+            )}
             <div className="text-center">
-              <h2 className="text-2xl font-semibold">{formData.name}</h2>
-              <p className="text-muted-foreground">{formData.email}</p>
+              <h2 className="text-2xl font-semibold">{isEditing ? formData.name : user.displayName || 'User Name'}</h2>
+              <p className="text-muted-foreground">{user.email}</p>
             </div>
           </div>
 
           <div className="md:col-span-2 space-y-6">
             {isEditing ? (
-              <form className="space-y-4">
+              <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
                 <div>
                   <Label htmlFor="name">Name</Label>
                   <Input id="name" name="name" value={formData.name} onChange={handleInputChange} />
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} disabled/>
+                  <Input id="email" name="email" type="email" value={formData.email} disabled />
                 </div>
                 <div>
                   <Label htmlFor="age">Age</Label>
-                  <Input id="age" name="age" type="number" value={formData.age} onChange={handleInputChange} />
+                  <Input id="age" name="age" type="number" value={formData.age} onChange={handleInputChange} placeholder="e.g., 25 (Firestore)" />
                 </div>
                 <div>
                   <Label htmlFor="school">School</Label>
-                  <Input id="school" name="school" value={formData.school} onChange={handleInputChange} />
+                  <Input id="school" name="school" value={formData.school} onChange={handleInputChange} placeholder="e.g., University of Medical Sciences (Firestore)" />
                 </div>
                 <div>
                   <Label htmlFor="degree">Degree</Label>
-                  <Input id="degree" name="degree" value={formData.degree} onChange={handleInputChange} />
+                  <Input id="degree" name="degree" value={formData.degree} onChange={handleInputChange} placeholder="e.g., MD Candidate (Firestore)" />
                 </div>
               </form>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div><span className="font-medium text-muted-foreground">Age:</span> {userProfile.age}</div>
-                <div><span className="font-medium text-muted-foreground">School:</span> {userProfile.school}</div>
-                <div className="sm:col-span-2"><span className="font-medium text-muted-foreground">Degree:</span> {userProfile.degree}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-4">
+                <div><span className="font-medium text-muted-foreground">Age:</span> {formData.age || 'N/A (Edit to add)'}</div>
+                <div><span className="font-medium text-muted-foreground">School:</span> {formData.school || 'N/A (Edit to add)'}</div>
+                <div className="sm:col-span-2"><span className="font-medium text-muted-foreground">Degree:</span> {formData.degree || 'N/A (Edit to add)'}</div>
+                <p className="sm:col-span-2 text-xs text-muted-foreground pt-2">Additional details like Age, School, and Degree are stored in Firestore (not yet fully implemented for saving).</p>
               </div>
             )}
           </div>
