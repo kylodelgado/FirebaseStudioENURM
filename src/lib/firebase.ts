@@ -5,10 +5,10 @@ import { getStorage, type FirebaseStorage } from "firebase/storage"; // Import F
 // import { getAnalytics, type Analytics } from "firebase/analytics"; // Analytics can be added later if needed
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDg-LFktZlDEM3RA6CeDA3h6zpxvnQKGJc", // Replace with your actual API key
+  apiKey: "AIzaSyDg-LFktZlDEM3RA6CeDA3h6zpxvnQKGJc",
   authDomain: "practica-enurm.firebaseapp.com",
   projectId: "practica-enurm",
-  storageBucket: "practica-enurm.appspot.com", // Ensure this is correct (usually project-id.appspot.com)
+  storageBucket: "practica-enurm.firebasestorage.app", // Updated storageBucket
   messagingSenderId: "871687048018",
   appId: "1:871687048018:web:bd0bc7443767621f5b488b",
   measurementId: "G-WBM6688EKB"
