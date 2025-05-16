@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
@@ -8,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDg-LFktZlDEM3RA6CeDA3h6zpxvnQKGJc",
   authDomain: "practica-enurm.firebaseapp.com",
   projectId: "practica-enurm",
-  storageBucket: "practica-enurm.firebasestorage.app", // Updated storageBucket
+  storageBucket: "practica-enurm.appspot.com", // Canonical storage bucket name
   messagingSenderId: "871687048018",
   appId: "1:871687048018:web:bd0bc7443767621f5b488b",
   measurementId: "G-WBM6688EKB"
