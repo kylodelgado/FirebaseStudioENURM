@@ -7,7 +7,7 @@ import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ADMIN_USER_IDS } from '@/lib/adminConfig'; // Import admin UIDs
+import { ADMIN_EMAILS } from '@/lib/adminConfig'; // Import admin emails
 
 interface AuthContextType {
   user: User | null;
@@ -28,8 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (currentUser) {
-        setIsAdmin(ADMIN_USER_IDS.includes(currentUser.uid)); // Check if user is admin
+      if (currentUser && currentUser.email) {
+        setIsAdmin(ADMIN_EMAILS.includes(currentUser.email)); // Check if user's email is in admin list
       } else {
         setIsAdmin(false);
       }
